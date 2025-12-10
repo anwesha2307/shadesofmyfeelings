@@ -1,5 +1,8 @@
 name: Copy folder in repo
 
+permissions:
+  contents: write
+  
 on:
   workflow_dispatch:
     inputs:
