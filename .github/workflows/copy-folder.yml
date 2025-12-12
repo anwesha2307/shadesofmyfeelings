@@ -1,8 +1,11 @@
-name: Copy folder in repo
+name: Copy folder in another repo
 
 on:
   workflow_dispatch:
     inputs:
+      target_repo:
+        description: "Target repo in owner/name format (e.g. anwesha2307/shadesofmyfeelings)"
+        required: true
       source_folder:
         description: "Folder to copy from (e.g. 3)"
         required: true
@@ -10,21 +13,73 @@ on:
         description: "New folder name (e.g. 4)"
         required: true
 
+permissions:
+  contents: write
+  pull-requests: write
+
 jobs:
-  copy-and-commit:
+  copy-and-pr:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout repo
+      # 1️⃣ Checkout TARGET repo (the one we want to modify) into ./target-repo
+      - name: Checkout target repo
         uses: actions/checkout@v4
         with:
-          token: ${{ secrets.GITHUB_TOKEN }}
+          repository: ${{ github.event.inputs.target_repo }}
+          token: ${{ secrets.PAT_REPOS }}
+          ref: main
+          path: target-repo
+
+      # 2️⃣ Checkout AUTOMATION repo (this repo, where the script lives) into ./automation-repo
+      - name: Checkout automation repo (this repo)
+        uses: actions/checkout@v4
+        with:
+          # This is the repo where the workflow is defined
+          repository: ${{ github.repository }}
+          token: ${{ secrets.PAT_REPOS }}
+          path: automation-repo
 
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.x"
 
-      - name: Run copy script
+      # 3️⃣ Create a new branch in the TARGET repo
+      - name: Create new branch in target repo
+        id: create_branch
+        working-directory: target-repo
         run: |
-          python scripts/copy_and_commit.py "${{ github.event.inputs.source_folder }}" "${{ github.event.inputs.dest_folder }}"
+          BRANCH="copy-${{ github.event.inputs.source_folder }}-to-${{ github.event.inputs.dest_folder }}"
+          echo "branch_name=$BRANCH" >> $GITHUB_OUTPUT
+          git checkout -b "$BRANCH"
+
+      # 4️⃣ Run the script from Repo A, pointing it at Repo B
+      - name: Run copy script from automation repo on target repo
+        run: |
+          python automation-repo/automation_scripts/copy_and_commit.py \
+            target-repo \
+            "${{ github.event.inputs.source_folder }}" \
+            "${{ github.event.inputs.dest_folder }}"
+
+      # 5️⃣ Push the new branch to the target repo
+      - name: Push new branch to target repo
+        working-directory: target-repo
+        run: |
+          git push origin "${{ steps.create_branch.outputs.branch_name }}"
+
+      # 6️⃣ Create PR in target repo
+      - name: Create Pull Request in target repo
+        uses: peter-evans/create-pull-request@v5
+        with:
+          token: ${{ secrets.PAT_REPOS }}
+          repo: ${{ github.event.inputs.target_repo }}
+          branch: ${{ steps.create_branch.outputs.branch_name }}
+          title: "Copy folder ${{ github.event.inputs.source_folder }} → ${{ github.event.inputs.dest_folder }}"
+          body: |
+            This PR was automatically created by an automation workflow in **${{ github.repository }}**.
+
+            Target repo: **${{ github.event.inputs.target_repo }}**
+            Folders copied:
+            - From: **${{ github.event.inputs.source_folder }}**
+            - To: **${{ github.event.inputs.dest_folder }}**

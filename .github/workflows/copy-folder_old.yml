@@ -1,0 +1,30 @@
+name: Copy folder in repo
+
+on:
+  workflow_dispatch:
+    inputs:
+      source_folder:
+        description: "Folder to copy from (e.g. 3)"
+        required: true
+      dest_folder:
+        description: "New folder name (e.g. 4)"
+        required: true
+
+jobs:
+  copy-and-commit:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout repo
+        uses: actions/checkout@v4
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.x"
+
+      - name: Run copy script
+        run: |
+          python scripts/copy_and_commit.py "${{ github.event.inputs.source_folder }}" "${{ github.event.inputs.dest_folder }}"

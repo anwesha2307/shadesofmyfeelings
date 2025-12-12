@@ -28,7 +28,7 @@ def main():
     shutil.copytree(src_folder, dst_folder)
     print("Copy complete.")
 
-    # Git add/commit/push
+    # Git add/commit
     subprocess.check_call(["git", "config", "user.name", "automation-bot"])
     subprocess.check_call(["git", "config", "user.email", "bot@example.com"])
 
@@ -36,7 +36,7 @@ def main():
 
     commit_message = f"Copy folder {src} to {dst}"
     subprocess.check_call(["git", "commit", "-m", commit_message], cwd=repo_path)
-    subprocess.check_call(["git", "push", "origin", "main"], cwd=repo_path)
+    #subprocess.check_call(["git", "push", "origin", "main"], cwd=repo_path)
 
     print("All done! Folder copied, committed, and pushed.")
 
