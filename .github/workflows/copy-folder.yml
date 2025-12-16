@@ -57,7 +57,7 @@ jobs:
       # 4️⃣ Run the script from Repo A, pointing it at Repo B
       - name: Run copy script from automation repo on target repo
         run: |
-          python scripts/copy_and_commit.py \
+          python automation-repo/scripts/copy_and_commit.py \
             target-repo \
             "${{ github.event.inputs.source_folder }}" \
             "${{ github.event.inputs.dest_folder }}"
