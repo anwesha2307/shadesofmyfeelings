@@ -6,6 +6,10 @@ on:
       target_repo:
         description: "Target repo in owner/name format (e.g. anwesha2307/shadesofmyfeelings)"
         required: true
+      target_base_branch:
+        description: "Branch in target repo that contains the source folder (e.g. main, master, release/1.0)"
+        required: true
+        default: "main"
       source_folder:
         description: "Folder to copy from (e.g. 3)"
         required: true
@@ -28,7 +32,7 @@ jobs:
         with:
           repository: ${{ github.event.inputs.target_repo }}
           token: ${{ secrets.PAT_REPOS }}
-          ref: main
+          ref: ${{ github.event.inputs.target_base_branch }}
           path: target-repo
 
       # 2️⃣ Checkout AUTOMATION repo (this repo, where the script lives) into ./automation-repo
@@ -77,7 +81,7 @@ jobs:
           gh pr create \
             --repo "${{ github.event.inputs.target_repo }}" \
             --head "${{ steps.create_branch.outputs.branch_name }}" \
-            --base "main" \
+            --base "${{ github.event.inputs.target_base_branch }}" \
             --title "Copy folder ${{ github.event.inputs.source_folder }} → ${{ github.event.inputs.dest_folder }}" \
             --body "This PR was automatically created by an automation workflow in **${{ github.repository }}**.
 
