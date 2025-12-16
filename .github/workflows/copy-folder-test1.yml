@@ -22,32 +22,20 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Validate inputs and token
-        run: |
-          if [ -z "${{ github.event.inputs.target_repo }}" ]; then
-              echo "ERROR: target_repo input is empty. Provide owner/repo when running the workflow."
-              exit 1
-          fi
-          if [ -z "${{ secrets.PAT_REPOS }}" ]; then
-              echo "ERROR: secret PAT_REPOS is not set. Add a PAT with repo scope to the repository secrets."
-              exit 1
-          fi
-
-      # Checkout target repo only if the input is present
+      # 1️⃣ Checkout TARGET repo (the one we want to modify) into ./target-repo
       - name: Checkout target repo
-        if: ${{ github.event.inputs.target_repo != '' }}
         uses: actions/checkout@v4
         with:
           repository: ${{ github.event.inputs.target_repo }}
           token: ${{ secrets.PAT_REPOS }}
           ref: main
           path: target-repo
-          fetch-depth: 0
 
-      # Checkout this automation repo
+      # 2️⃣ Checkout AUTOMATION repo (this repo, where the script lives) into ./automation-repo
       - name: Checkout automation repo (this repo)
         uses: actions/checkout@v4
         with:
+          # This is the repo where the workflow is defined
           repository: ${{ github.repository }}
           token: ${{ secrets.PAT_REPOS }}
           path: automation-repo
@@ -57,13 +45,7 @@ jobs:
         with:
           python-version: "3.x"
 
-      - name: Configure git user in target repo
-        if: ${{ github.event.inputs.target_repo != '' }}
-        working-directory: target-repo
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-
+      # 3️⃣ Create a new branch in the TARGET repo
       - name: Create new branch in target repo
         id: create_branch
         working-directory: target-repo
@@ -72,6 +54,7 @@ jobs:
           echo "branch_name=$BRANCH" >> $GITHUB_OUTPUT
           git checkout -b "$BRANCH"
 
+      # 4️⃣ Run the script from Repo A, pointing it at Repo B
       - name: Run copy script from automation repo on target repo
         run: |
           python automation-repo/scripts/copy_and_commit.py \
@@ -79,11 +62,13 @@ jobs:
             "${{ github.event.inputs.source_folder }}" \
             "${{ github.event.inputs.dest_folder }}"
 
+      # 5️⃣ Push the new branch to the target repo
       - name: Push new branch to target repo
         working-directory: target-repo
         run: |
           git push origin "${{ steps.create_branch.outputs.branch_name }}"
 
+      # 6️⃣ Create PR in target repo
       - name: Create Pull Request in target repo
         uses: peter-evans/create-pull-request@v5
         with:
