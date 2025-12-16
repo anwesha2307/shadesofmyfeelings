@@ -70,16 +70,18 @@ jobs:
 
       # 6️⃣ Create PR in target repo
       - name: Create Pull Request in target repo
-        uses: peter-evans/create-pull-request@v5
-        with:
-          token: ${{ secrets.PAT_REPOS }}
-          repo: ${{ github.event.inputs.target_repo }}
-          branch: ${{ steps.create_branch.outputs.branch_name }}
-          title: "Copy folder ${{ github.event.inputs.source_folder }} → ${{ github.event.inputs.dest_folder }}"
-          body: |
-            This PR was automatically created by an automation workflow in **${{ github.repository }}**.
+        working-directory: target-repo
+        env:
+          GH_TOKEN: ${{ secrets.PAT_REPOS }}
+        run: |
+          gh pr create \
+            --repo "${{ github.event.inputs.target_repo }}" \
+            --head "${{ steps.create_branch.outputs.branch_name }}" \
+            --base "main" \
+            --title "Copy folder ${{ github.event.inputs.source_folder }} → ${{ github.event.inputs.dest_folder }}" \
+            --body "This PR was automatically created by an automation workflow in **${{ github.repository }}**.
 
-            Target repo: **${{ github.event.inputs.target_repo }}**
-            Folders copied:
-            - From: **${{ github.event.inputs.source_folder }}**
-            - To: **${{ github.event.inputs.dest_folder }}**
+          Target repo: **${{ github.event.inputs.target_repo }}**
+          Folders copied:
+          - From: **${{ github.event.inputs.source_folder }}**
+          - To: **${{ github.event.inputs.dest_folder }}**"
