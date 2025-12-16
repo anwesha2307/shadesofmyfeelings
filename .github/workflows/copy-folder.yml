@@ -82,7 +82,8 @@ jobs:
       - name: Push new branch to target repo
         working-directory: target-repo
         run: |
-          git push origin "${{ steps.create_branch.outputs.branch_name }}"
+          git pull origin "${{ steps.create_branch.outputs.branch_name }}" || true
+            git push origin "${{ steps.create_branch.outputs.branch_name }}"
 
       - name: Create Pull Request in target repo
         uses: peter-evans/create-pull-request@v5
