@@ -1,4 +1,4 @@
-name: Copy folder in another repo
+name: Copy folder in another repo test
 
 on:
   workflow_dispatch:
@@ -6,10 +6,6 @@ on:
       target_repo:
         description: "Target repo in owner/name format (e.g. anwesha2307/shadesofmyfeelings)"
         required: true
-      target_branch:
-        description: "Target branch name in the target repo (default: main)"
-        required: false
-        default: "main"
       source_folder:
         description: "Folder to copy from (e.g. 3)"
         required: true
@@ -26,102 +22,55 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Validate inputs and token
-        run: |
-          if [ -z "${{ secrets.PAT_REPOS }}" ]; then
-            echo "ERROR: secret PAT_REPOS is not set. Add a PAT with repo scope to the repository secrets."
-            exit 1
-          fi
-
+      # 1️⃣ Checkout TARGET repo (the one we want to modify) into ./target-repo
       - name: Checkout target repo
-        if: ${{ github.event.inputs.target_repo != '' }}
         uses: actions/checkout@v4
         with:
           repository: ${{ github.event.inputs.target_repo }}
           token: ${{ secrets.PAT_REPOS }}
-          ref: ${{ github.event.inputs.target_branch }}
+          ref: main
           path: target-repo
-          fetch-depth: 0
 
+      # 2️⃣ Checkout AUTOMATION repo (this repo, where the script lives) into ./automation-repo
       - name: Checkout automation repo (this repo)
         uses: actions/checkout@v4
         with:
+          # This is the repo where the workflow is defined
           repository: ${{ github.repository }}
           token: ${{ secrets.PAT_REPOS }}
           path: automation-repo
-          fetch-depth: 1
 
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.x"
 
-      - name: Debug: show inputs and directories
-        run: |
-          echo "target_repo='${{ github.event.inputs.target_repo }}'"
-          echo "target_branch='${{ github.event.inputs.target_branch }}'"
-          echo "source_folder='${{ github.event.inputs.source_folder }}'"
-          echo "dest_folder='${{ github.event.inputs.dest_folder }}'"
-          echo "workspace: $GITHUB_WORKSPACE"
-          ls -la
-          if [ -d target-repo ]; then
-            echo "target-repo exists:"
-            ls -la target-repo | sed -n '1,200p'
-          else
-            echo "target-repo directory does not exist"
-          fi
-
-      - name: Configure git user in target repo
-        if: ${{ github.event.inputs.target_repo != '' }}
-        working-directory: target-repo
-        run: |
-          git config user.name "github-actions[bot]"
-          git config user.email "github-actions[bot]@users.noreply.github.com"
-
-      - name: Create and switch to new branch in target repo
+      # 3️⃣ Create a new branch in the TARGET repo
+      - name: Create new branch in target repo
         id: create_branch
         working-directory: target-repo
         run: |
-          set -e
           BRANCH="copy-${{ github.event.inputs.source_folder }}-to-${{ github.event.inputs.dest_folder }}"
           echo "branch_name=$BRANCH" >> $GITHUB_OUTPUT
-          # Ensure we have the remote refs
-          git fetch origin --prune
-          # Try to base the new branch on the remote target branch if it exists
-          if git ls-remote --exit-code --heads origin "${{ github.event.inputs.target_branch }}"; then
-            git checkout -b "$BRANCH" "origin/${{ github.event.inputs.target_branch }}"
-          else
-            # fallback: create branch from current checkout (if any)
-            git checkout -b "$BRANCH"
-          fi
+          git checkout -b "$BRANCH"
 
+      # 4️⃣ Run the script from Repo A, pointing it at Repo B
       - name: Run copy script from automation repo on target repo
         run: |
           python automation-repo/scripts/copy_and_commit.py \
             target-repo \
             "${{ github.event.inputs.source_folder }}" \
             "${{ github.event.inputs.dest_folder }}"
-        env:
-          # do not expose PAT_REPOS in logs; it will be masked automatically
-          GITHUB_TOKEN: ${{ secrets.PAT_REPOS }}
 
+      # 5️⃣ Push the new branch to the target repo
       - name: Push new branch to target repo
         working-directory: target-repo
         run: |
-          set -e
-          BRANCH="${{ steps.create_branch.outputs.branch_name }}"
-          git status --porcelain || true
-          # Add and commit may have been done by the script; ensure we push the branch
-          git add -A || true
-          # Only commit if there are staged changes
-          if [ -n "$(git diff --cached --name-only)" ]; then
-            git commit -m "Copy folder ${{ github.event.inputs.source_folder }} → ${{ github.event.inputs.dest_folder }}" || true
-          fi
-          git push --set-upstream origin "$BRANCH"
+          git push origin "${{ steps.create_branch.outputs.branch_name }}"
 
+      # 6️⃣ Create PR in target repo
       - name: Create Pull Request in target repo
         uses: peter-evans/create-pull-request@v5
-        working-directory: target-repo
         with:
           token: ${{ secrets.PAT_REPOS }}
           repo: ${{ github.event.inputs.target_repo }}
