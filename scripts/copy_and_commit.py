@@ -4,30 +4,51 @@ import subprocess
 import sys
 
 
+def resolve_repo_path(repo_path: str) -> str:
+    """
+    If repo_path is relative, resolve it relative to GitHub Actions workspace
+    (GITHUB_WORKSPACE) when available, otherwise resolve relative to cwd.
+    """
+    if os.path.isabs(repo_path):
+        return repo_path
+
+    workspace = os.environ.get("GITHUB_WORKSPACE")
+    if workspace:
+        return os.path.abspath(os.path.join(workspace, repo_path))
+
+    return os.path.abspath(repo_path)
+
+
 def main():
-    # Expected usage:
+    # Usage:
     # python copy_and_commit.py <repo_path> <source_folder> <dest_folder>
     if len(sys.argv) != 4:
         print("Usage: python copy_and_commit.py <repo_path> <source_folder> <dest_folder>")
         sys.exit(1)
 
-    repo_path = sys.argv[1]
+    repo_path = resolve_repo_path(sys.argv[1])
     src = sys.argv[2]
     dst = sys.argv[3]
 
-    # Make repo_path absolute (so it works no matter where you run from)
-    repo_path = os.path.abspath(repo_path)
+    # Sanity check: repo_path must exist
+    if not os.path.isdir(repo_path):
+        print(f"Repo path does not exist or is not a directory: {repo_path}")
+        sys.exit(1)
 
-    # Build absolute paths to folders inside the target repo
+    # Sanity check: must be a git repo (actions/checkout creates .git by default)
+    git_dir = os.path.join(repo_path, ".git")
+    if not os.path.exists(git_dir):
+        print(f"Not a git repository (missing .git): {repo_path}")
+        print("Tip: ensure the target repo is checked out with actions/checkout and path is correct.")
+        sys.exit(1)
+
     src_folder = os.path.join(repo_path, src)
     dst_folder = os.path.join(repo_path, dst)
 
-    # Validate source exists and is a directory
     if not os.path.isdir(src_folder):
         print(f"Source folder does not exist: {src_folder}")
         sys.exit(1)
 
-    # Prevent overwriting destination
     if os.path.exists(dst_folder):
         print(f"Destination folder already exists: {dst_folder}")
         sys.exit(1)
