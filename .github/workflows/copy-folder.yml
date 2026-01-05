@@ -13,6 +13,10 @@ on:
       source_folder:
         description: "Folder to copy from (e.g. 3)"
         required: true
+      destination_path:
+        description: "Destination directory path inside target repo (e.g. docs, content/posts, src/assets). Use '.' for repo root."
+        required: true
+        default: "."
       dest_folder:
         description: "New folder name (e.g. 4)"
         required: true
@@ -39,7 +43,6 @@ jobs:
       - name: Checkout automation repo (this repo)
         uses: actions/checkout@v4
         with:
-          # This is the repo where the workflow is defined
           repository: ${{ github.repository }}
           token: ${{ secrets.PAT_REPOS }}
           path: automation-repo
@@ -54,7 +57,10 @@ jobs:
         id: create_branch
         working-directory: target-repo
         run: |
-          BRANCH="copy-${{ github.event.inputs.source_folder }}-to-${{ github.event.inputs.dest_folder }}"
+          BRANCH="copy-${{ github.event.inputs.source_folder }}-to-${{ github.event.inputs.destination_path }}-${{ github.event.inputs.dest_folder }}"
+          # Make it git-branch safe (replace slashes/spaces)
+          BRANCH="${BRANCH//\//-}"
+          BRANCH="${BRANCH// /-}"
           echo "branch_name=$BRANCH" >> $GITHUB_OUTPUT
           git checkout -b "$BRANCH"
 
@@ -64,6 +70,7 @@ jobs:
           python automation-repo/scripts/copy_and_commit.py \
             target-repo \
             "${{ github.event.inputs.source_folder }}" \
+            "${{ github.event.inputs.destination_path }}" \
             "${{ github.event.inputs.dest_folder }}"
 
       # 5️⃣ Push the new branch to the target repo
@@ -82,10 +89,10 @@ jobs:
             --repo "${{ github.event.inputs.target_repo }}" \
             --head "${{ steps.create_branch.outputs.branch_name }}" \
             --base "${{ github.event.inputs.target_base_branch }}" \
-            --title "Copy folder ${{ github.event.inputs.source_folder }} → ${{ github.event.inputs.dest_folder }}" \
+            --title "Copy folder ${{ github.event.inputs.source_folder }} → ${{ github.event.inputs.destination_path }}/${{ github.event.inputs.dest_folder }}" \
             --body "This PR was automatically created by an automation workflow in **${{ github.repository }}**.
 
           Target repo: **${{ github.event.inputs.target_repo }}**
           Folders copied:
           - From: **${{ github.event.inputs.source_folder }}**
-          - To: **${{ github.event.inputs.dest_folder }}**"
+          - To: **${{ github.event.inputs.destination_path }}/${{ github.event.inputs.dest_folder }}**"
