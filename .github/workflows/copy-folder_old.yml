@@ -1,4 +1,4 @@
-name: Copy folder in another repo test
+name: Copy folder in another repo test-old
 
 on:
   workflow_dispatch:
