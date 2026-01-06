@@ -30,7 +30,7 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # 1️⃣ Checkout TARGET repo (the one we want to modify) into ./target-repo
+      # 1: Checkout TARGET repo (the one we want to modify) into ./target-repo
       - name: Checkout target repo
         uses: actions/checkout@v4
         with:
@@ -39,7 +39,7 @@ jobs:
           ref: ${{ github.event.inputs.target_base_branch }}
           path: target-repo
 
-      # 2️⃣ Checkout AUTOMATION repo (this repo, where the script lives) into ./automation-repo
+      # 2: Checkout AUTOMATION repo (this repo, where the script lives) into ./automation-repo
       - name: Checkout automation repo (this repo)
         uses: actions/checkout@v4
         with:
@@ -52,7 +52,7 @@ jobs:
         with:
           python-version: "3.x"
 
-      # 3️⃣ Create a new branch in the TARGET repo
+      # 3: Create a new branch in the TARGET repo
       - name: Create new branch in target repo
         id: create_branch
         working-directory: target-repo
@@ -64,7 +64,7 @@ jobs:
           echo "branch_name=$BRANCH" >> $GITHUB_OUTPUT
           git checkout -b "$BRANCH"
 
-      # 4️⃣ Run the script from Repo A, pointing it at Repo B
+      # 4: Run the script from Repo A, pointing it at Repo B
       - name: Run copy script from automation repo on target repo
         run: |
           python automation-repo/scripts/copy_and_commit.py \
@@ -73,13 +73,13 @@ jobs:
             "${{ github.event.inputs.destination_path }}" \
             "${{ github.event.inputs.dest_folder }}"
 
-      # 5️⃣ Push the new branch to the target repo
+      # 5: Push the new branch to the target repo
       - name: Push new branch to target repo
         working-directory: target-repo
         run: |
           git push origin "${{ steps.create_branch.outputs.branch_name }}"
 
-      # 6️⃣ Create PR in target repo
+      # 6: Create PR in target repo
       - name: Create Pull Request in target repo
         working-directory: target-repo
         env:

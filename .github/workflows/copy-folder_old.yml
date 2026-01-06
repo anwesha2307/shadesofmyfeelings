@@ -4,7 +4,7 @@ on:
   workflow_dispatch:
     inputs:
       target_repo:
-        description: "Target repo in owner/name format (e.g. anwesha2307/shadesofmyfeelings)"
+        description: "Target repo in owner/name format"
         required: true
       target_base_branch:
         description: "Branch in target repo that contains the source folder (e.g. main, master, release/1.0)"
