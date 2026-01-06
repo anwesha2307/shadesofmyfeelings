@@ -1,0 +1,118 @@
+name: Update YAML
+
+on:
+  workflow_dispatch:
+    inputs:
+      target_repo:
+        description: "Target repo in owner/name format (example: my-org/my-config-repo)"
+        required: true
+      target_branch:
+        description: "Branch/tag/SHA in Repo B to base changes on (example: main)"
+        required: true
+        default: "main"
+      excel_path:
+        description: "Path to Excel/CSV INSIDE Repo B (example: data/params.xlsx)"
+        required: true
+      yaml_path:
+        description: "Path to YAML INSIDE Repo B to update (example: configs/app.yml)"
+        required: true
+      key_col:
+        description: "Excel column name for keys"
+        required: true
+        default: "key"
+      value_col:
+        description: "Excel column name for values"
+        required: true
+        default: "value"
+      sheet:
+        description: "Excel sheet name (optional). Leave blank for default."
+        required: false
+        default: ""
+      add_missing:
+        description: "Add keys missing in YAML? (true/false)"
+        required: true
+        default: "true"
+
+jobs:
+  update_yaml_repo_b:
+    runs-on: ubuntu-latest
+
+    steps:
+      # Checkout Repo A (this repo) to get the script + workflow files
+      - name: Checkout Repo A (automation repo)
+        uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+
+      # Checkout Repo B where the Excel + YAML live
+      - name: Checkout Repo B (data/config repo)
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ github.event.inputs.target_repo }}
+          ref: ${{ github.event.inputs.target_branch }}
+          token: ${{ secrets.REPO_B_TOKEN }}
+          path: target_repo
+
+      - name: Run updater against YAML in Repo B
+        run: |
+          set -euo pipefail
+
+          EXCEL="target_repo/${{ github.event.inputs.excel_path }}"
+          YAML_FILE="target_repo/${{ github.event.inputs.yaml_path }}"
+          KEY_COL="${{ github.event.inputs.key_col }}"
+          VALUE_COL="${{ github.event.inputs.value_col }}"
+          SHEET="${{ github.event.inputs.sheet }}"
+          ADD_MISSING="${{ github.event.inputs.add_missing }}"
+
+          if [ ! -f "$EXCEL" ]; then
+            echo "ERROR: Excel/CSV not found at $EXCEL"
+            exit 2
+          fi
+
+          if [ ! -f "$YAML_FILE" ]; then
+            echo "ERROR: YAML not found at $YAML_FILE"
+            exit 2
+          fi
+
+          CMD="python scripts/update_yaml_from_sheet.py \
+            --input \"$EXCEL\" \
+            --targets \"$YAML_FILE\" \
+            --key-col \"$KEY_COL\" \
+            --value-col \"$VALUE_COL\""
+
+          if [ -n "$SHEET" ]; then
+            CMD="$CMD --sheet \"$SHEET\""
+          fi
+
+          if [ "$ADD_MISSING" = "false" ]; then
+            CMD="$CMD --no-add-missing"
+          fi
+
+          echo "Running: $CMD"
+          eval "$CMD"
+
+      # Create PR in Repo B with the changes
+      - name: Create Pull Request in Repo B
+        uses: peter-evans/create-pull-request@v6
+        with:
+          path: target_repo
+          token: ${{ secrets.REPO_B_TOKEN }}
+          commit-message: "Update ${{ github.event.inputs.yaml_path }} from ${{ github.event.inputs.excel_path }}"
+          title: "Update YAML from Excel input"
+          body: |
+            Automated update from Repo A workflow.
+
+            - Repo B: ${{ github.event.inputs.target_repo }}
+            - Base ref: ${{ github.event.inputs.target_branch }}
+            - Excel/CSV: ${{ github.event.inputs.excel_path }}
+            - YAML updated: ${{ github.event.inputs.yaml_path }}
+          branch: automation/update-yaml-${{ github.run_id }}
+          delete-branch: true
