@@ -7,14 +7,14 @@ on:
         description: "Target repo in owner/name format (example: my-org/my-config-repo)"
         required: true
       target_branch:
-        description: "Branch/tag/SHA in Repo B to base changes on (example: main)"
+        description: "Branch/tag/SHA in target repo to base changes on (example: main)"
         required: true
         default: "main"
       excel_path:
-        description: "Path to Excel/CSV INSIDE Repo B (example: data/params.xlsx)"
+        description: "Path to Excel/CSV INSIDE target repo (example: data/params.xlsx)"
         required: true
       yaml_path:
-        description: "Path to YAML INSIDE Repo B to update (example: configs/app.yml)"
+        description: "Path to YAML INSIDE target repo to update (example: configs/app.yml)"
         required: true
       key_col:
         description: "Excel column name for keys"
@@ -82,7 +82,7 @@ jobs:
             exit 2
           fi
 
-          CMD="python scripts/update_yaml_from_sheet.py \
+          CMD="python scripts/update_yml.py \
             --input \"$EXCEL\" \
             --targets \"$YAML_FILE\" \
             --key-col \"$KEY_COL\" \
@@ -100,7 +100,7 @@ jobs:
           eval "$CMD"
 
       # Create PR in Repo B with the changes
-      - name: Create Pull Request in Repo B
+      - name: Create Pull Request in Target Repo
         uses: peter-evans/create-pull-request@v6
         with:
           path: target_repo
