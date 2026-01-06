@@ -12,7 +12,12 @@ def read_key_values(input_path: Path, key_col: str, value_col: str, sheet: str |
     suffix = input_path.suffix.lower()
 
     if suffix in [".xlsx", ".xls"]:
-        df = pd.read_excel(input_path, sheet_name=sheet, dtype=str)
+        if sheet and str(sheet).strip() != "":
+            df = pd.read_excel(input_path, sheet_name=sheet, dtype=str)
+        else:
+        # default sheet (first sheet)
+            df = pd.read_excel(input_path, dtype=str)
+
     elif suffix == ".csv":
         df = pd.read_csv(input_path, dtype=str)
     else:
